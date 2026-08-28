@@ -50,6 +50,7 @@ int rud, elev, thrust;
 // User Settings
 bool test_running = false;
 unsigned long test_start = 0;
+unsigned long elapsed = 0;
 
 //Heading
 bool hdg_en = true;
@@ -85,13 +86,15 @@ PID pitch_pid(pitch_kp, pitch_ki, pitch_kd,100);
 void setup() {
   // Initialisation 
   Serial.begin(115200);
-  WiFi.mode (WIFI_STA);
+  //WiFi.mode (WIFI_STA);
   WiFi.begin(ssid, password);
+
+  Serial.println("Attempting to connect to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
     Serial.println("Attempting to connect to WiFi");
     delay(1000);
   }
-  WiFi.setSleep(false);
+  //WiFi.setSleep(WIFI_PS_NONE);
   Serial.println(WiFi.localIP().toString());
   
   while(!bno.begin()) {
@@ -105,6 +108,7 @@ void setup() {
   server.on("/state", handleState);
   server.on("/test", HTTP_PUT,handleTest);
   server.begin();
+  //server.  getServer().setTimeout(2);
 
   thruster.setPeriodHertz(50);
   thruster.attach(THRUST, 1500, 1700);
@@ -134,7 +138,7 @@ void loop() {
     hdg = hdg - 360;
   
   
-  unsigned long elapsed = millis() - test_start;
+  elapsed = millis() - test_start;
   
   // If enabled, determine control output from PIDs
   if (pitch_en) {
@@ -144,13 +148,14 @@ void loop() {
   }
   if (hdg_en) {
     rud  = int(1500 +  4 * hdg_pid.run(hdg_sp, hdg, DELAY_MS));
-  } else {
-    rud = 1500 + 4 * rudder_sp;
-    if (test_running){
-      if (elapsed > rudder_change) 
-        rud = rudder_next;
-    }
+  } 
+  else if(test_running) {
+    if (elapsed > rudder_change) 
+      rud = 1500 + 4 * rudder_next;
+    else
+      rud = 1500 + 4 * rudder_sp;
   }
+  
 
   if (test_running) {
     if (elapsed > thruster_stop) {
@@ -160,11 +165,11 @@ void loop() {
     else if (elapsed > thruster_start) 
       thrust = thruster_sp;
     else 
-      thrust = 1500;;
+      thrust = 1500;
   } else {
     thrust = 1500;
   }
-  Serial.printf("%d %d %d %d %d\n", test_running, elapsed, thrust, rud, elev) ;
+  //Serial.printf("%d %d %d %d %d %d\n", test_running, elapsed, thrust, rud, elev, rudder_change) ;
   
   rudder.write(rud);
   elevator.write(elev);
@@ -172,9 +177,10 @@ void loop() {
   
   //Serial.printf("Thrust: %d Rudder: %d Elevator: %d\n",1500, rud, elev);
   // Handle UI
-  server.handleClient();
-  server.client().flush();
-  server.client().stop();
+  //if (server.client().connected()){
+    server.handleClient();
+    server.client().stop();
+  //}
 
   // Delay to maintain update rate
   delay(DELAY_MS);
@@ -183,17 +189,27 @@ void loop() {
 void handleRoot() {
   Serial.println("Root Request");
   String html = getHTML();
+  server.sendHeader("Connection", "close");
   server.send(200, "text/html", html);
 }
 
 void handleState() {
-  char response[128];
-  sprintf(response,"{\"hdg\": \"%+04.0f\", \"pitch\": \"%+06.1f\", \"cal\": \"%u\", \"rud\": \"%d\", \"elev\": \"%d\"}", hdg, pitch, sys, rud, elev);
+  //Serial.println("State Request");
+  char response[256];
+  sprintf(response,"{\"hdg\": \"%+04.0f\", \"pitch\": \"%+06.1f\", \"cal\": \"%u\", \"rud\": \"%d\", \"elev\": \"%d\", \"thrust\": \"%d\", \"elapsed\": \"%u\", \"run\": \"%u\"}", hdg, pitch, sys, rud, elev,thrust,elapsed,test_running);
+  server.sendHeader("Connection", "close");
   server.send(200, "application/json", response);
 }
 
 void handleTest() {
   char response[64];
+
+  if (test_running) {
+    sprintf(response, "{}");
+    server.send(200, "application/json", response);
+    return;
+  }
+
   String json = server.arg("plain");
   Serial.println(json);
   JsonDocument doc;
@@ -220,10 +236,10 @@ void handleTest() {
 
     rudder_sp = atoi(doc["rudder_init"]);
     rudder_next = atoi(doc["rudder_change"]);
-    rudder_change = 1000 * atoi(doc["rudder_change"]);
+    rudder_change = 1000 * atoi(doc["rudder_time"]);
     Serial.println("Rudder parsed"); 
 
-    elevator_sp = atoi(doc["rudder_init"]);
+    elevator_sp = atoi(doc["elevator_init"]);
 
     sprintf(response, "{}");
     server.send(200, "application/json", response);
