@@ -11,6 +11,9 @@
 #include "WebIF.h"
 #include "PID.h"
 
+#include "esp_log.h"
+#include "esp_wifi.h"
+
 // System constants
 const unsigned long DELAY_MS      = 50;
 const unsigned long UPDATE_MS     = 100;
@@ -86,13 +89,20 @@ PID pitch_pid(pitch_kp, pitch_ki, pitch_kd,100);
 void setup() {
   // Initialisation 
   Serial.begin(115200);
-  //WiFi.mode (WIFI_STA);
+      esp_log_level_set("wifi", ESP_LOG_VERBOSE);
+
+  WiFi.mode (WIFI_STA);
+  WiFi.disconnect();
+  delay(1000);
   WiFi.begin(ssid, password);
 
   Serial.println("Attempting to connect to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Attempting to connect to WiFi");
-    delay(1000);
+    delay(2000);
+    //WiFi.begin(ssid, password);
+    Serial.print("Attempting to connect to WiFi: ");
+    Serial.print(WiFi.status());
+    Serial.println();
   }
   //WiFi.setSleep(WIFI_PS_NONE);
   Serial.println(WiFi.localIP().toString());
@@ -196,7 +206,7 @@ void handleRoot() {
 void handleState() {
   //Serial.println("State Request");
   char response[256];
-  sprintf(response,"{\"hdg\": \"%+04.0f\", \"pitch\": \"%+06.1f\", \"cal\": \"%u\", \"rud\": \"%d\", \"elev\": \"%d\", \"thrust\": \"%d\", \"elapsed\": \"%u\", \"run\": \"%u\"}", hdg, pitch, sys, rud, elev,thrust,elapsed,test_running);
+  sprintf(response,"{\"hdg\": \"%+04.0f\", \"pitch\": \"%+06.1f\", \"cal\": \"%u\", \"rud\": \"%d\", \"elev\": \"%d\", \"thrust\": \"%d\", \"elapsed\": \"%u\", \"run\": \"%u\"}", hdg, pitch, sys, rud, elev,thrust,test_running*elapsed/1000,test_running);
   server.sendHeader("Connection", "close");
   server.send(200, "application/json", response);
 }
@@ -231,12 +241,12 @@ void handleTest() {
     Serial.println("Heading parsed");
 
     thruster_start = 1000 * atoi(doc["thrust_start"]);
-    thruster_stop = 1000 * atoi(doc["thrust_stop"]);
+    thruster_stop = thruster_start + 1000 * atoi(doc["thrust_stop"]);
     Serial.println("Thruster parsed");
 
     rudder_sp = atoi(doc["rudder_init"]);
     rudder_next = atoi(doc["rudder_change"]);
-    rudder_change = 1000 * atoi(doc["rudder_time"]);
+    rudder_change = thruster_start + 1000 * atoi(doc["rudder_time"]);
     Serial.println("Rudder parsed"); 
 
     elevator_sp = atoi(doc["elevator_init"]);

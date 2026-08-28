@@ -15,9 +15,14 @@ String html = R"(
     <strong>  Calibration: </strong><span id="cal">0</span>
     
     <H2>Controller Status</H2>
+    <H3>Test Status</H3>
+    <strong>Running: </strong><span id="running">false</span>
+    <strong>  Elapsed: </strong><span id="elapsed">false</span>
+    
     <H3>Control Surface</H3>
     <strong>Rudder: </strong><span id="rud">0.00</span>
     <strong>  Elevator: </strong><span id="elev">0.00</span>
+    <strong>  Thruster: </strong><span id="thrust">0.00</span>
     
     <H2>Test Parameters</H2>
     <form id="testform">
@@ -59,6 +64,9 @@ String html = R"(
                 document.getElementById("cal").innerHTML = data.cal;
                 document.getElementById("rud").innerHTML = data.rud;
                 document.getElementById("elev").innerHTML = data.elev;
+                document.getElementById("running").innerHTML = data.run;
+                document.getElementById("thrust").innerHTML = data.thrust;
+                document.getElementById("elapsed").innerHTML = data.elapsed;
             } catch (error) {
                 console.error('Failed to fetch IMU:', error);
             }
