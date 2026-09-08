@@ -70,7 +70,7 @@ float pitch_ki = 0.0;
 float pitch_kd = 0.0;
 
 //Thruster
-int thruster_sp = 1600;
+int thruster_sp = 1650;
 unsigned long thruster_start = 0;
 unsigned long thruster_stop = 0;
 
@@ -84,6 +84,10 @@ int elevator_sp = 0;
 
 PID hdg_pid(hdg_kp, hdg_ki, hdg_kd, 100);
 PID pitch_pid(pitch_kp, pitch_ki, pitch_kd,100);
+
+//WiFi Watchdog
+unsigned long prev_millis = 0;
+unsigned long wifi_check = 1000;
 
 
 void setup() {
@@ -117,6 +121,7 @@ void setup() {
   server.on("/", handleRoot);
   server.on("/state", handleState);
   server.on("/test", HTTP_PUT,handleTest);
+  server.on("/thruster", handleThruster);
   server.begin();
   //server.  getServer().setTimeout(2);
 
@@ -192,6 +197,15 @@ void loop() {
     server.client().stop();
   //}
 
+  if (millis() - prev_millis >= wifi_check) {
+    if (!test_running) {
+      if (WiFi.status() != WL_CONNECTED) {
+        WiFi.disconnect();
+        WiFi.begin(ssid, password);
+      }
+    }
+    prev_millis = millis();
+  }
   // Delay to maintain update rate
   delay(DELAY_MS);
 }
@@ -201,6 +215,15 @@ void handleRoot() {
   String html = getHTML();
   server.sendHeader("Connection", "close");
   server.send(200, "text/html", html);
+}
+
+void handleThruster() {
+  if (server.hasArg("us")){
+    thruster_sp = server.arg("us").toInt();
+    server.send(200, "text/plain", "Updated Thruster SP: " + String(thruster_sp));
+  } else {
+    server.send(200, "text/plain", "Thruster SP: " + String(thruster_sp));
+  }
 }
 
 void handleState() {

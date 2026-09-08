@@ -25,9 +25,28 @@ public:
   }
 
   float run(float sp, float in, float dt_ms) {
+    // Error
     float err = sp - in;
-    float out =  kp * err;
 
+    // Proportional Term
+    float p_term =  kp * err;
+
+    // Time step between updates
+    float dt = dt_ms / 1000.0;
+
+    // Integral Term
+    integral += (err * dt);
+    float i_term = ki * integral;
+
+    // Derivative Term
+    float derivative = (err - prev_err) / dt;
+    float d_term = kd * derivative;
+    prev_err = err;
+
+    // PID Output
+    float out = p_term + i_term + d_term;
+
+    // Restrict to limit
     return fmax(-limit, fmin(limit, out));
   }
 
@@ -36,5 +55,7 @@ private:
   float kp = 0.0;
   float ki = 0.0;
   float kd = 0.0;
+  float integral = 0.0;
+  float prev_err = 0.0;
   float limit = 100;
 };
