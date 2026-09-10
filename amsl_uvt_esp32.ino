@@ -122,6 +122,7 @@ void setup() {
   server.on("/state", handleState);
   server.on("/test", HTTP_PUT,handleTest);
   server.on("/thruster", handleThruster);
+  server.on("/reset", handleReset);
   server.begin();
   //server.  getServer().setTimeout(2);
 
@@ -216,7 +217,9 @@ void handleRoot() {
   server.sendHeader("Connection", "close");
   server.send(200, "text/html", html);
 }
-
+void handleReset() {
+  ESP.restart();
+}
 void handleThruster() {
   if (server.hasArg("us")){
     thruster_sp = server.arg("us").toInt();

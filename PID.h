@@ -12,6 +12,7 @@ public:
     ki = Ki;
     kd = Kd;
     limit = Limit;
+    integral_limit = limit/10.0;
   }
 
   void updateGains(float Kp, float Ki, float Kd) {
@@ -36,6 +37,8 @@ public:
 
     // Integral Term
     integral += (err * dt);
+    // Prevent windup
+    integral = fmax(-integral_limit, fmin(integral_limit, integral));
     float i_term = ki * integral;
 
     // Derivative Term
@@ -58,4 +61,5 @@ private:
   float integral = 0.0;
   float prev_err = 0.0;
   float limit = 100;
+  float integral_limit = 10;
 };
