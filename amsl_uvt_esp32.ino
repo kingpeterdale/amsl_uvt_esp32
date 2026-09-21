@@ -11,17 +11,16 @@
 #include "WebIF.h"
 #include "PID.h"
 
+#include <EEPROM.h>
+
 #include "esp_log.h"
 #include "esp_wifi.h"
 
 // System constants
 const unsigned long DELAY_MS      = 50;
 const unsigned long UPDATE_MS     = 100;
-const unsigned long MAX_CONTROL   = 400;
-const unsigned long MAX_ELEV_ANG  = 30;
-const unsigned long MAX_RUD_ANG   = 60;
-const float         RUD_TO_SERVO  = MAX_CONTROL / MAX_RUD_ANG;
-const float         ELEV_TO_SERVO = MAX_CONTROL / MAX_ELEV_ANG;
+const unsigned long MAX_CONTROL   = 600;
+const unsigned long PID_FACTOR    = MAX_CONTROL / 100;
 const char * ssid = "AMSLBOT";
 const char * password = "AMCAMSL7248";
 
@@ -40,13 +39,15 @@ Servo rudder;
 Servo elevator;
 
 Adafruit_BNO055 bno = Adafruit_BNO055(-1, 0x28, &Wire);
+adafruit_bno055_offsets_t imu_offsets;
+
 
 WebServer server(80);
 
 unsigned long last_update = millis();
 
 // System State
-uint8_t sys, gyro, accel, mag ;
+bool cal = false;
 float hdg, pitch;
 int rud, elev, thrust;
 
@@ -95,8 +96,10 @@ void setup() {
   Serial.begin(115200);
       esp_log_level_set("wifi", ESP_LOG_VERBOSE);
 
-  WiFi.mode (WIFI_STA);
   WiFi.disconnect();
+  WiFi.mode (WIFI_STA);
+  WiFi.setSleep(false);
+  WiFi.onEvent(handleDisconnect, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   delay(1000);
   WiFi.begin(ssid, password);
 
@@ -111,11 +114,13 @@ void setup() {
   //WiFi.setSleep(WIFI_PS_NONE);
   Serial.println(WiFi.localIP().toString());
   
-  while(!bno.begin()) {
+  while(!bno.begin(OPERATION_MODE_IMUPLUS)) {
     // Do not proceed without IMU
     Serial.println("BNO055 not detected ...");
     delay(1000);
   }
+
+  EEPROM.begin(sizeof(imu_offsets));
 
   // Configure Web Interface
   server.on("/", handleRoot);
@@ -127,7 +132,7 @@ void setup() {
   //server.  getServer().setTimeout(2);
 
   thruster.setPeriodHertz(50);
-  thruster.attach(THRUST, 1500, 1700);
+  thruster.attach(THRUST, 1300, 1700);
   thruster.write(1500);
 
   rudder.setPeriodHertz(50);
@@ -144,7 +149,21 @@ void loop() {
   // Main program loop
   
   // Get values from IMU
-  bno.getCalibration(&sys, &gyro, &accel, &mag);
+  bool prev_cal = cal;
+  cal = bno.isFullyCalibrated();
+  if (!prev_cal && cal) {
+    // Update stored calibration
+    bno.getSensorOffsets(imu_offsets);
+    EEPROM.put(0,imu_offsets);
+    EEPROM.commit();
+    Serial.println("Storing IMU Offsets");
+  }
+  else if (prev_cal && !cal) {
+    EEPROM.get(0,imu_offsets);
+    bno.setSensorOffsets(imu_offsets);
+    Serial.println("Recovering IMU Offsets");
+  }
+  
   imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
   
   // Peform any conversion or normalisation
@@ -158,18 +177,18 @@ void loop() {
   
   // If enabled, determine control output from PIDs
   if (pitch_en) {
-    elev = int(1500 + 4 * pitch_pid.run(pitch_sp, pitch, DELAY_MS));
+    elev = int(1500 + PID_FACTOR * pitch_pid.run(pitch_sp, pitch, DELAY_MS));
   } else {
-    elev = 1500 + 4 * elevator_sp;
+    elev = 1500 + PID_FACTOR * elevator_sp;
   }
   if (hdg_en) {
-    rud  = int(1500 +  4 * hdg_pid.run(hdg_sp, hdg, DELAY_MS));
+    rud  = int(1500 +  PID_FACTOR * hdg_pid.run(hdg_sp, hdg, DELAY_MS));
   } 
   else if(test_running) {
     if (elapsed > rudder_change) 
-      rud = 1500 + 4 * rudder_next;
+      rud = 1500 + PID_FACTOR * rudder_next;
     else
-      rud = 1500 + 4 * rudder_sp;
+      rud = 1500 + PID_FACTOR * rudder_sp;
   }
   
 
@@ -199,6 +218,7 @@ void loop() {
   //}
 
   if (millis() - prev_millis >= wifi_check) {
+    server.client().stop();
     if (!test_running) {
       if (WiFi.status() != WL_CONNECTED) {
         WiFi.disconnect();
@@ -209,6 +229,11 @@ void loop() {
   }
   // Delay to maintain update rate
   delay(DELAY_MS);
+}
+
+void handleDisconnect(WiFiEvent_t event, WiFiEventInfo_t info) {
+  Serial.println("WiFi Disconnected");
+  server.client().stop();
 }
 
 void handleRoot() {
@@ -232,7 +257,7 @@ void handleThruster() {
 void handleState() {
   //Serial.println("State Request");
   char response[256];
-  sprintf(response,"{\"hdg\": \"%+04.0f\", \"pitch\": \"%+06.1f\", \"cal\": \"%u\", \"rud\": \"%d\", \"elev\": \"%d\", \"thrust\": \"%d\", \"elapsed\": \"%u\", \"run\": \"%u\"}", hdg, pitch, sys, rud, elev,thrust,test_running*elapsed/1000,test_running);
+  sprintf(response,"{\"hdg\": \"%+04.0f\", \"pitch\": \"%+06.1f\", \"cal\": \"%u\", \"rud\": \"%d\", \"elev\": \"%d\", \"thrust\": \"%d\", \"elapsed\": \"%u\", \"run\": \"%u\"}", hdg, pitch, cal, rud, elev,thrust,test_running*elapsed/1000,test_running);
   server.sendHeader("Connection", "close");
   server.send(200, "application/json", response);
 }

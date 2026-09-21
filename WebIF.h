@@ -28,16 +28,16 @@ String html = R"(
     <form id="testform">
         <H3>Pitch PID</H3>
         <label for="pitch_enable">Enable</label><input type="checkbox" id="pitch_enable" name="pitch_enable" value="pitch_enable">
-        <label for="KP">KP:</label><input type="number" id="pitch_kp" name="pitch_kp" min="0.0" max="5.0" step="0.1" value="0">
-        <label for="KI">KI:</label><input type="number" id="pitch_ki" name="pitch_ki" min="0.0" max="5.0" step="0.1" value="0">
-        <label for="KD">KD:</label><input type="number" id="pitch_kd" name="pitch_kd" min="0.0" max="5.0" step="0.1" value="0">
+        <label for="KP">KP:</label><input type="number" id="pitch_kp" name="pitch_kp" min="-5.0" max="5.0" step="0.1" value="0">
+        <label for="KI">KI:</label><input type="number" id="pitch_ki" name="pitch_ki" min="-5.0" max="5.0" step="0.1" value="0">
+        <label for="KD">KD:</label><input type="number" id="pitch_kd" name="pitch_kd" min="-5.0" max="5.0" step="0.1" value="0">
         <label for="KP">Setpoint:</label><input type="number" id="pitch_sp" name="pitch_sp" min="-10" max="10.0" step="0.1" value="0">
 
         <H3>Heading PID</H3>
         <label for="heading_enable">Enable</label><input type="checkbox" id="heading_enable" name="heading_enable" value="headign_enable">
-        <label for="KP">KP:</label><input type="number" id="heading_kp" name="heading_kp" min="0.0" max="5.0" step="0.1" value="0">
-        <label for="KI">KI:</label><input type="number" id="heading_ki" name="heading_ki" min="0.0" max="5.0" step="0.1" value="0">
-        <label for="KD">KD:</label><input type="number" id="heading_kd" name="heading_kd" min="0.0" max="5.0" step="0.1" value="0">
+        <label for="KP">KP:</label><input type="number" id="heading_kp" name="heading_kp" min="-5.0" max="5.0" step="0.1" value="0">
+        <label for="KI">KI:</label><input type="number" id="heading_ki" name="heading_ki" min="-5.0" max="5.0" step="0.1" value="0">
+        <label for="KD">KD:</label><input type="number" id="heading_kd" name="heading_kd" min="-5.0" max="5.0" step="0.1" value="0">
         
         <H3>Thruster</H3>
         <label for="thrust_start">Start Time: </label><input type="number" id="thrust_start" name="thrust_start" min="0" max="60" step="1" value="0">
