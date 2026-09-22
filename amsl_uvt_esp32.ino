@@ -58,6 +58,7 @@ unsigned long elapsed = 0;
 
 //Heading
 bool hdg_en = true;
+bool hdg_set = false;
 float hdg_sp = 0.0;
 float hdg_kp = 0.0;
 float hdg_ki = 0.0;
@@ -181,7 +182,7 @@ void loop() {
   } else {
     elev = 1500 + PID_FACTOR * elevator_sp;
   }
-  if (hdg_en) {
+  if (hdg_en && test_running && hdg_set) {
     rud  = int(1500 +  PID_FACTOR * hdg_pid.run(hdg_sp, hdg, DELAY_MS));
   } 
   else if(test_running) {
@@ -190,17 +191,25 @@ void loop() {
     else
       rud = 1500 + PID_FACTOR * rudder_sp;
   }
+  else {
+    rud = 1500;
+  }
   
 
   if (test_running) {
     if (elapsed > thruster_stop) {
+      hdg_set = false;
       thrust = 1500;
       test_running = false;
     }
-    else if (elapsed > thruster_start) 
+    else if (elapsed > thruster_start){
+      if (!hdg_set){
+        hdg_sp = hdg;
+        hdg_set = true;
+      } 
       thrust = thruster_sp;
-    else 
-      thrust = 1500;
+    }
+    else thrust = 1500;
   } else {
     thrust = 1500;
   }
@@ -284,7 +293,8 @@ void handleTest() {
     Serial.println("Pitch parsed");
 
     hdg_en = doc["heading_en"];
-    hdg_sp = hdg;
+    //hdg_sp = hdg;
+    hdg_set = false;
     hdg_kp = atof(doc["heading_kp"]);
     hdg_ki = atof(doc["heading_ki"]);
     hdg_kd = atof(doc["heading_kd"]);
